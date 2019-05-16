@@ -61,6 +61,9 @@ _mktemp
 
 Example of exported report:
 ```
+sh ipa_check.sh $path_to_ipa -e
+```
+```
 ***Start validate _NSLog stack_chk_guard _objc_release _ptrace***
 App info
  1.0(1)
