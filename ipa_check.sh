@@ -1,8 +1,8 @@
 # ipa checke
 # A simple ipa security check tool.
-# Wayne Apr 8, 2019
+# Wayne Hsiao chronicqazxc@gmail.com Apr 8, 2019
 appName="ipa checke"
-version="v0.1.0"
+version="v0.1.1"
 #!/bin/sh
 
 RCol='\033[0m'
@@ -29,6 +29,7 @@ now="$(date '+%Y-%m-%d_%H.%M.%S')"
 validResults=()
 invalidResults=()
 
+# Reference: https://github.com/MobSF/Mobile-Security-Framework-MobSF/blob/bbaec066344f486c96a3d57be3287a74ea18e2a0/StaticAnalyzer/views/ios/binary_analysis.py#L141
 function bannedApis() {
   if [[ $isExamineBannedApi == 1 ]];then
     apis="_alloca;_gets;_memcpy;_printf;_scanf;_sprintf;_sscanf;_strcat;StrCat;_strcpy;StrCpy;_strlen;StrLen;_strncat;StrNCat;_strncpy;StrNCpy;_strtok;_swprintf;_vsnprintf;_vsprintf;_vswprintf;_wcscat;_wcscpy;_wcslen;_wcsncat;_wcsncpy;_wcstok;_wmemcpy;_fopen;_chmod;_chown;_stat;_mktemp"
@@ -125,11 +126,11 @@ function printKeyInvalidValue() {
   if [[ $isPrintWithColor == 1 ]];then
     printContnet="    $RCol $key:$Red$value"
   else
-    printContnet="    $key:$value <<< invalid"
+    printContnet="    $key:$value"
   fi
 
-  echo $printContnet
-  invalidResults+=("$printContnet")
+  echo "$printContnet"
+  invalidResults+=("\n$printContnet")
 }
 
 function printResultByKeyValue() {
@@ -162,45 +163,50 @@ function printContentsByFrameworkPathBinaryPathAndKey() {
     value=$(/usr/bin/otool -Iv $binaryPath | /usr/bin/grep $key)
     if [[ ${value//[$'\t\r\n ']} != "" ]]; then
       if [[ $key == "_NSLog" ]]; then
-        if [[ $isPrintWithColor == 1 ]];then
-          echo $Red "Warning!!! NSLog be used" $RCol
-        else
-          echo "Warning!!! NSLog be used"
-        fi
-        echo "${value}"
+        # if [[ $isPrintWithColor == 1 ]];then
+        #   echo $Red "Warning!!! NSLog be used" $RCol
+        # else
+        #   echo "Warning!!! NSLog be used"
+        # fi
+        # echo "${value}"
+        printKeyInvalidValue "$(getFileName $framework).$(getFileExtension $framework): ${key}" " NSLog be used"
       elif [[ 0 == $(containsElement ${key} $(bannedApis)) ]]; then
-        if [[ $isPrintWithColor == 1 ]];then
-          echo $Red "Warning!!! Banned api was used ${key}" $RCol
-        else
-          echo "Warning!!! Banned api was used ${key}"
-        fi
-        echo "${value}"
+        # if [[ $isPrintWithColor == 1 ]];then
+        #   echo $Red "Warning!!! Banned api was used ${key}" $RCol
+        # else
+        #   echo "Warning!!! Banned api was used ${key}"
+        # fi
+        # echo "${value}"
+        printKeyInvalidValue "$(getFileName $framework).$(getFileExtension $framework): ${key}" " This API should be avoided."
       else
-        echo "${value}"
+        # printKeyValidValue $key $value
+        a="a"
       fi
     else
       if [[ $key == "_objc_release" ]]; then
-        if [[ $isPrintWithColor == 1 ]];then
-          echo $Red "Warning!!! fobjc-arc flag was not found" $RCol
-        else
-          echo "Warning!!! fobjc-arc flag was not found"
-        fi
-      fi
-
-      if [[ $key == "stack_chk_guard" ]]; then
-        if [[ $isPrintWithColor == 1 ]];then
-          echo $Red "Warning!!! fstack-protector-all flag was not found" $RCol
-        else
-          echo "Warning!!! fstack-protector-all flag was not found"
-        fi
-      fi
-
-      if [[ $key == "_ptrace" ]]; then
-        if [[ $isPrintWithColor == 1 ]];then
-          echo $Red "Warning!!! Binary does not call ptrace" $RCol
-        else
-          echo "Warning!!! Binary does not call ptrace"
-        fi
+        # if [[ $isPrintWithColor == 1 ]];then
+        #   echo $Red "Warning!!! fobjc-arc flag was not found" $RCol
+        # else
+        #   echo "Warning!!! fobjc-arc flag was not found"
+        # fi
+        printKeyInvalidValue "$(getFileName $framework).$(getFileExtension $framework): ${key}" " fobjc-arc flag was not found"
+      elif [[ $key == "stack_chk_guard" ]]; then
+        # if [[ $isPrintWithColor == 1 ]];then
+        #   echo $Red "Warning!!! fstack-protector-all flag was not found" $RCol
+        # else
+        #   echo "Warning!!! fstack-protector-all flag was not found"
+        # fi
+        printKeyInvalidValue "$(getFileName $framework).$(getFileExtension $framework): ${key}" " fstack-protector-all flag was not found"
+      elif [[ $key == "_ptrace" ]]; then
+        # if [[ $isPrintWithColor == 1 ]];then
+        #   echo $Red "Warning!!! Binary does not call ptrace" $RCol
+        # else
+        #   echo "Warning!!! Binary does not call ptrace"
+        # fi
+        printKeyInvalidValue "$(getFileName $framework).$(getFileExtension $framework): ${key}" " Binary does not call ptrace"
+      else
+        # printKeyValidValue $key $value
+        a="a"
       fi
     fi
   fi
@@ -285,7 +291,7 @@ function printHeaderByArgs() {
 function printResult() {
   echo "***Result***"
   if [[ "${#validResults[@]}" == 0 ]];then
-    echo "No valid result"
+    echo ""
   elif [[ "${#validResults[@]}" == 1 ]];then
     echo "Valid result:${#validResults[@]}"
   else
@@ -350,10 +356,10 @@ function printXCArchive() {
   framework="$PWD/$destination/Payload/$framework"
 
   plistPath="${framework}/info.plist"
-  bundleDisplayName=$(/usr/libexec/PlistBuddy -c Print:"CFBundleDisplayName" $plistPath)
-  bundleIdentifier=$(/usr/libexec/PlistBuddy -c Print:"CFBundleIdentifier" $plistPath)
-  bundleVersion=$(/usr/libexec/PlistBuddy -c Print:"CFBundleVersion" $plistPath)
-  bundeVersionString=$(/usr/libexec/PlistBuddy -c Print:"CFBundleShortVersionString" $plistPath)
+  bundleDisplayName=$(/usr/libexec/PlistBuddy -c Print:"CFBundleDisplayName" $plistPath 2>/dev/null)
+  bundleIdentifier=$(/usr/libexec/PlistBuddy -c Print:"CFBundleIdentifier" $plistPath 2>/dev/null)
+  bundleVersion=$(/usr/libexec/PlistBuddy -c Print:"CFBundleVersion" $plistPath 2>/dev/null)
+  bundeVersionString=$(/usr/libexec/PlistBuddy -c Print:"CFBundleShortVersionString" $plistPath 2>/dev/null)
   if [[ $isPrintWithColor == 1 ]];then
     echo $Red "App info\n$bundleDisplayName ${bundeVersionString}(${bundleVersion})\n$bundleIdentifier" $RCol
     echo "------------------------------------------"
@@ -368,9 +374,11 @@ function printXCArchive() {
   frameworks="${framework}/Frameworks"
   for framework in "$frameworks"/*
   do
-    printFramework $framework "${ARGS[@]}"
-    printBundleByFramework $framework "${ARGS[@]}"
-    echo "------------------------------------------"
+    if [[ $(getFileExtension $framework) != "dylib" ]];then
+      printFramework $framework "${ARGS[@]}"
+      printBundleByFramework $framework "${ARGS[@]}"
+      echo "------------------------------------------"
+    fi
   done
 }
 
